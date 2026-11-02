@@ -1,4 +1,4 @@
 [submodule "bugsplat-sys/bugsplat-native"]
 	path = bugsplat-sys/bugsplat-native
 	url = https://github.com/BugSplat-Git/bugsplat-native
-	branch = feat/m1-core
+	branch = fix/cmake-add-subdirectory

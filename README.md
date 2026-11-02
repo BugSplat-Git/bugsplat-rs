@@ -120,9 +120,9 @@ BUGSPLAT_DATABASE=my-db cargo run -p crasher -- segv      # also: abort, stack-o
 
 ## Development
 
-> **Linux, until bugsplat-native's CMake fix (`fix/cmake-add-subdirectory`) is merged into
-> `feat/m1-core`:** the pinned submodule fails to configure on Linux (`reporter/theme/theme.json`
-> not found). Build against a checkout with the fix via `BUGSPLAT_NATIVE_SRC`.
+> The `bugsplat-native` submodule is pinned to the head of
+> [bugsplat-native#14](https://github.com/BugSplat-Git/bugsplat-native/pull/14) (a CMake fix that
+> Linux builds need); repoint it at `feat/m1-core` once that PR is merged.
 
 ```sh
 cargo test --workspace --all-features
