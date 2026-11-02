@@ -70,8 +70,11 @@ npx @bugsplat/symbol-upload -b my-database -a MyApp -v 1.2.3 -d target/release -
 ### Packaging the helpers
 
 `BugSplatMonitor` (captures crashes) and `BugSplatReporter` (dialog and upload) are separate
-executables that ship with your app. `bugsplat-sys` builds them; their paths reach your build
-script as `DEP_BUGSPLAT_MONITOR` / `DEP_BUGSPLAT_REPORTER` (or `DEP_TAURI_PLUGIN_BUGSPLAT_*`).
+executables that ship with your app. `bugsplat-sys` builds them. Cargo passes their paths only to
+the build scripts of crates that depend on `bugsplat-sys` directly, so add it to your
+`[dependencies]` next to `bugsplat` and read `DEP_BUGSPLAT_MONITOR` / `DEP_BUGSPLAT_REPORTER` in
+your `build.rs`. Tauri apps read `DEP_TAURI_PLUGIN_BUGSPLAT_MONITOR` /
+`DEP_TAURI_PLUGIN_BUGSPLAT_REPORTER` instead (see [Tauri](#tauri)).
 bugsplat-native looks next to the executable, in `Helpers/`, and on macOS in
 `<App>.app/Contents/Helpers`. During development (`cargo run`) nothing needs packaging: when no
 packaged helpers are found, `bugsplat` uses the ones built for this compilation.
