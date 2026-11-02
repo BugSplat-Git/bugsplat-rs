@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = ["bugsplat-sys", "bugsplat", "tauri-plugin-bugsplat", "examples/crasher"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/BugSplat-Git/bugsplat-rs"
+authors = ["BugSplat <support@bugsplat.com>"]
+rust-version = "1.81"
+
+[workspace.dependencies]
+bugsplat-sys = { path = "bugsplat-sys", version = "0.1.0" }
+bugsplat = { path = "bugsplat", version = "0.1.0" }
+
+# Line tables + a .dSYM on macOS for `symbol-upload -m`. On Linux build with
+# CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO=off (dump_syms does not read .dwp); see README.
+[profile.release]
+debug = "line-tables-only"
+split-debuginfo = "packed"

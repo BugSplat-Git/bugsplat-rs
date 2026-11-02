@@ -1,0 +1,24 @@
+[package]
+name = "bugsplat"
+description = "Crash reporting for Rust apps with BugSplat: out-of-process minidumps, panics and webview JavaScript errors"
+readme = "../README.md"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+categories = ["development-tools::debugging"]
+keywords = ["bugsplat", "crash", "minidump", "crash-reporting", "panic"]
+
+[features]
+default = []
+## JavaScript error reports to BugSplat's post/js endpoint (for webview apps).
+js = ["dep:ureq", "dep:serde", "dep:serde_json"]
+
+[dependencies]
+bugsplat-sys.workspace = true
+thiserror = "2"
+ureq = { version = "3", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }

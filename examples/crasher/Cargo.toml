@@ -1,0 +1,11 @@
+[package]
+name = "crasher"
+description = "Triggers every kind of failure bugsplat-rs reports"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+bugsplat = { workspace = true, features = ["js"] }
+serde_json = "1"

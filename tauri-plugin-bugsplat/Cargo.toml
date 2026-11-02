@@ -1,0 +1,29 @@
+[package]
+name = "tauri-plugin-bugsplat"
+description = "BugSplat crash reporting for Tauri: native crashes, Rust panics and webview JavaScript errors"
+readme = "README.md"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+links = "tauri-plugin-bugsplat"
+categories = ["development-tools::debugging", "gui"]
+keywords = ["tauri-plugin", "bugsplat", "crash-reporting", "minidump"]
+
+[features]
+default = ["wry"]
+## Report the WebKit/WebView2/WebKitGTK version (needs Tauri's default wry runtime).
+wry = ["tauri/wry"]
+
+[dependencies]
+bugsplat = { workspace = true, features = ["js"] }
+# Direct dependency so build.rs receives DEP_BUGSPLAT_MONITOR / DEP_BUGSPLAT_REPORTER.
+bugsplat-sys.workspace = true
+tauri = { version = "2", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          # bugsplat-native is private until it is published; a token with read access is needed.
+          token: ${{ secrets.BUGSPLAT_NATIVE_TOKEN || github.token }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: seanmiddleditch/gha-setup-ninja@v5
+      - name: Linux packages (Tauri plugin)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            target
+            .crashpad-cache
+          key: ${{ runner.os }}-${{ hashFiles('Cargo.lock', 'bugsplat-sys/bugsplat-native/cmake/crashpad.lock') }}
+      - name: cargo test
+        run: cargo test --workspace --all-features
+        env:
+          BUGSPLAT_CRASHPAD_CACHE: ${{ github.workspace }}/.crashpad-cache
+      - name: init.js tests
+        run: node --test tauri-plugin-bugsplat/js/init.test.js
+      - name: clippy
+        run: cargo clippy --workspace --all-features -- -D warnings
