@@ -3,7 +3,8 @@ name = "bugsplat-sys"
 description = "Raw FFI bindings to bugsplat-native, BugSplat's out-of-process crash reporter (Crashpad)"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+# The vendored bugsplat-native source includes WTL (MS-PL), used by the Windows reporter.
+license = "MIT AND MS-PL"
 repository.workspace = true
 authors.workspace = true
 rust-version.workspace = true

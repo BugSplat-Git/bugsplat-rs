@@ -118,6 +118,36 @@ BUGSPLAT_DATABASE=my-db cargo run -p crasher -- segv      # also: abort, stack-o
                                                           # panic-thread, panic-ffi, capture, js
 ```
 
+## Third-party licenses
+
+bugsplat-rs is MIT. An app that ships `BugSplatMonitor` and `BugSplatReporter` also redistributes
+the code compiled into them, so include these notices with your app (e.g. in an "Acknowledgements"
+file or About box):
+
+| Component | License | Platforms |
+|---|---|---|
+| [bugsplat-native](https://github.com/BugSplat-Git/bugsplat-native) | MIT | all |
+| [Crashpad](https://chromium.googlesource.com/crashpad/crashpad) | Apache-2.0 | all |
+| mini_chromium | BSD-3-Clause | all |
+| miniz, nlohmann/json | MIT | all |
+| lss (linux-syscall-support) | BSD-3-Clause | Linux |
+| zlib | Zlib | Windows |
+| getopt | Public domain | Windows |
+| WTL | MS-PL | Windows (reporter) |
+
+The license texts for bugsplat-native and its vendored code are in `bugsplat-sys/bugsplat-native/`
+(`LICENSE`, `third_party/miniz/LICENSE`, `third_party/wtl/MS-PL.txt`; nlohmann/json's MIT notice is
+the header of `third_party/nlohmann/json.hpp`). Crashpad's `LICENSE` is in the prebuilt that `bugsplat-sys`
+downloads; prebuilts published after the current pin also carry the other components' licenses in
+`third_party_licenses/`. Until then, take mini_chromium's, lss's and zlib's from their
+repositories.
+
+The Rust crates `bugsplat` links are MIT or Apache-2.0. The `js` feature adds an HTTPS client whose
+dependencies include ISC (`ring`, `rustls-webpki`, `untrusted`), BSD-3-Clause (`subtle`) and
+CDLA-Permissive-2.0 (`webpki-roots`, Mozilla's CA certificates) code. A tool such as
+[cargo-about](https://github.com/EmbarkStudios/cargo-about) can generate the notices for your
+app's whole dependency tree.
+
 ## Development
 
 > The `bugsplat-native` submodule is pinned to the head of
