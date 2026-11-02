@@ -120,10 +120,6 @@ BUGSPLAT_DATABASE=my-db cargo run -p crasher -- segv      # also: abort, stack-o
 
 ## Development
 
-> The `bugsplat-native` submodule is pinned to the head of
-> [bugsplat-native#14](https://github.com/BugSplat-Git/bugsplat-native/pull/14) (a CMake fix that
-> Linux builds need); repoint it at `feat/m1-core` once that PR is merged.
-
 ```sh
 cargo test --workspace --all-features
 node --test tauri-plugin-bugsplat/js/init.test.js
