@@ -140,10 +140,9 @@ file or About box):
 
 The license texts for bugsplat-native and its vendored code are in `bugsplat-sys/bugsplat-native/`
 (`LICENSE`, `third_party/miniz/LICENSE`, `third_party/wtl/MS-PL.txt`; nlohmann/json's MIT notice is
-the header of `third_party/nlohmann/json.hpp`). Crashpad's `LICENSE` is in the prebuilt that `bugsplat-sys`
-downloads; prebuilts published after the current pin also carry the other components' licenses in
-`third_party_licenses/`. Until then, take mini_chromium's, lss's and zlib's from their
-repositories.
+the header of `third_party/nlohmann/json.hpp`). The Crashpad prebuilt that `bugsplat-sys` downloads
+has Crashpad's `LICENSE` and, in `third_party_licenses/`, those of mini_chromium, lss, zlib and getopt
+(each platform's prebuilt carries the ones it uses).
 
 The Rust crates `bugsplat` links are MIT or Apache-2.0. The `js` feature adds an HTTPS client whose
 dependencies include ISC (`ring`, `rustls-webpki`, `untrusted`), BSD-3-Clause (`subtle`) and
