@@ -70,8 +70,11 @@ npx @bugsplat/symbol-upload -b my-database -a MyApp -v 1.2.3 -d target/release -
 ### Packaging the helpers
 
 `BugSplatMonitor` (captures crashes) and `BugSplatReporter` (dialog and upload) are separate
-executables that ship with your app. `bugsplat-sys` builds them; their paths reach your build
-script as `DEP_BUGSPLAT_MONITOR` / `DEP_BUGSPLAT_REPORTER` (or `DEP_TAURI_PLUGIN_BUGSPLAT_*`).
+executables that ship with your app. `bugsplat-sys` builds them. Cargo passes their paths only to
+the build scripts of crates that depend on `bugsplat-sys` directly, so add it to your
+`[dependencies]` next to `bugsplat` and read `DEP_BUGSPLAT_MONITOR` / `DEP_BUGSPLAT_REPORTER` in
+your `build.rs`. Tauri apps read `DEP_TAURI_PLUGIN_BUGSPLAT_MONITOR` /
+`DEP_TAURI_PLUGIN_BUGSPLAT_REPORTER` instead (see [Tauri](#tauri)).
 bugsplat-native looks next to the executable, in `Helpers/`, and on macOS in
 `<App>.app/Contents/Helpers`. During development (`cargo run`) nothing needs packaging: when no
 packaged helpers are found, `bugsplat` uses the ones built for this compilation.
@@ -117,6 +120,35 @@ git clone --recursive https://github.com/BugSplat-Git/bugsplat-rs && cd bugsplat
 BUGSPLAT_DATABASE=my-db cargo run -p crasher -- segv      # also: abort, stack-overflow, panic,
                                                           # panic-thread, panic-ffi, capture, js
 ```
+
+## Third-party licenses
+
+bugsplat-rs is MIT. An app that ships `BugSplatMonitor` and `BugSplatReporter` also redistributes
+the code compiled into them, so include these notices with your app (e.g. in an "Acknowledgements"
+file or About box):
+
+| Component | License | Platforms |
+|---|---|---|
+| [bugsplat-native](https://github.com/BugSplat-Git/bugsplat-native) | MIT | all |
+| [Crashpad](https://chromium.googlesource.com/crashpad/crashpad) | Apache-2.0 | all |
+| mini_chromium | BSD-3-Clause | all |
+| miniz, nlohmann/json | MIT | all |
+| lss (linux-syscall-support) | BSD-3-Clause | Linux |
+| zlib | Zlib | Windows |
+| getopt | Public domain | Windows |
+| WTL | MS-PL | Windows (reporter) |
+
+The license texts for bugsplat-native and its vendored code are in `bugsplat-sys/bugsplat-native/`
+(`LICENSE`, `third_party/miniz/LICENSE`, `third_party/wtl/MS-PL.txt`; nlohmann/json's MIT notice is
+the header of `third_party/nlohmann/json.hpp`). The Crashpad prebuilt that `bugsplat-sys` downloads
+has Crashpad's `LICENSE` and, in `third_party_licenses/`, those of mini_chromium, lss, zlib and getopt
+(each platform's prebuilt carries the ones it uses).
+
+The Rust crates `bugsplat` links are MIT or Apache-2.0. The `js` feature adds an HTTPS client whose
+dependencies include ISC (`ring`, `rustls-webpki`, `untrusted`), BSD-3-Clause (`subtle`) and
+CDLA-Permissive-2.0 (`webpki-roots`, Mozilla's CA certificates) code. A tool such as
+[cargo-about](https://github.com/EmbarkStudios/cargo-about) can generate the notices for your
+app's whole dependency tree.
 
 ## Development
 

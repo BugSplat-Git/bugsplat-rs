@@ -40,3 +40,14 @@ jobs:
         run: node --test tauri-plugin-bugsplat/js/init.test.js
       - name: clippy
         run: cargo clippy --workspace --all-features -- -D warnings
+      - name: docs build as on docs.rs (which skips the native build)
+        if: runner.os == 'Linux'
+        run: cargo doc --workspace --all-features --no-deps
+        env:
+          DOCS_RS: "1"
+          BUGSPLAT_NATIVE_SRC: /nonexistent
+      - name: cargo package (builds each crate from its .crate, as crates.io users will)
+        if: runner.os == 'Linux'
+        run: cargo package --workspace
+        env:
+          BUGSPLAT_CRASHPAD_CACHE: ${{ github.workspace }}/.crashpad-cache

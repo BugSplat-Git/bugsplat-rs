@@ -4,6 +4,8 @@
 //! - `BUGSPLAT_NATIVE_SRC`: use this bugsplat-native checkout instead of the bundled submodule.
 //! - `BUGSPLAT_CRASHPAD_CACHE`: where bugsplat-native caches the pinned Crashpad prebuilt
 //!   (read by its CMake; set it to share one download across target directories).
+//! - `DOCS_RS`: set by docs.rs, which builds without network access; skips the native build,
+//!   since documentation needs no library to link.
 
 use std::collections::HashMap;
 use std::env;
@@ -14,6 +16,10 @@ fn main() {
     println!("cargo:rerun-if-env-changed=BUGSPLAT_NATIVE_SRC");
     println!("cargo:rerun-if-env-changed=BUGSPLAT_CRASHPAD_CACHE");
     println!("cargo:rerun-if-changed=cmake/CMakeLists.txt");
+    println!("cargo:rerun-if-env-changed=DOCS_RS");
+    if env::var_os("DOCS_RS").is_some() {
+        return;
+    }
 
     let native = env::var_os("BUGSPLAT_NATIVE_SRC")
         .map(PathBuf::from)
