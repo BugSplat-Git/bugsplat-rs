@@ -1,4 +1,4 @@
-//! Raw FFI bindings to [bugsplat-native](https://github.com/BugSplat-Git/bugsplat-native).
+//! Raw FFI bindings to bugsplat-native, BugSplat's native SDK.
 //!
 //! You almost certainly want the safe [`bugsplat`](https://docs.rs/bugsplat) crate instead.
 //!

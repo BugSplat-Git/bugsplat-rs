@@ -1,13 +1,14 @@
 # bugsplat-rs
 
 Crash reporting for Rust applications with [BugSplat](https://www.bugsplat.com), built on
-[bugsplat-native](https://github.com/BugSplat-Git/bugsplat-native) (Crashpad, out of process).
+bugsplat-native, BugSplat's native SDK (Crashpad, out of process). Setup guide:
+[docs.bugsplat.com](https://docs.bugsplat.com/integrations/desktop/rust).
 
 | Crate | What it is |
 |---|---|
-| [`bugsplat`](bugsplat) | Safe API: `init`, attributes, attachments, non-fatal captures, Rust panic reports, and (feature `js`) JavaScript errors from embedded webviews |
-| [`tauri-plugin-bugsplat`](tauri-plugin-bugsplat) | Tauri plugin: catches uncaught JS errors and unhandled rejections in every webview |
-| [`bugsplat-sys`](bugsplat-sys) | Raw FFI; builds bugsplat-native from source with CMake and links it statically |
+| [`bugsplat`](https://crates.io/crates/bugsplat) | Safe API: `init`, attributes, attachments, non-fatal captures, Rust panic reports, and (feature `js`) JavaScript errors from embedded webviews |
+| [`tauri-plugin-bugsplat`](https://crates.io/crates/tauri-plugin-bugsplat) | Tauri plugin: catches uncaught JS errors and unhandled rejections in every webview |
+| [`bugsplat-sys`](https://crates.io/crates/bugsplat-sys) | Raw FFI; builds bugsplat-native from source with CMake and links it statically |
 
 ## What gets reported
 
@@ -115,8 +116,9 @@ BugSplat origin. Call `window.BugSplat.post(error, { key: "value" })` to report 
 
 ## Trying it
 
+From a checkout of this repository:
+
 ```sh
-git clone --recursive https://github.com/BugSplat-Git/bugsplat-rs && cd bugsplat-rs
 BUGSPLAT_DATABASE=my-db cargo run -p crasher -- segv      # also: abort, stack-overflow, panic,
                                                           # panic-thread, panic-ffi, capture, js
 ```
@@ -129,7 +131,7 @@ file or About box):
 
 | Component | License | Platforms |
 |---|---|---|
-| [bugsplat-native](https://github.com/BugSplat-Git/bugsplat-native) | MIT | all |
+| bugsplat-native | MIT | all |
 | [Crashpad](https://chromium.googlesource.com/crashpad/crashpad) | Apache-2.0 | all |
 | mini_chromium | BSD-3-Clause | all |
 | miniz, nlohmann/json | MIT | all |

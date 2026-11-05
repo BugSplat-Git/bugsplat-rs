@@ -1,0 +1,4 @@
+# LF everywhere, including Windows checkouts: tauri-plugin-bugsplat's build script regenerates
+# permissions/ and rewrites any file whose bytes differ, which would leave a CRLF checkout dirty
+# (and cargo package refuses a dirty tree).
+* text=auto eol=lf
