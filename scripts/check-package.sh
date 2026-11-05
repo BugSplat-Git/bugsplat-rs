@@ -29,6 +29,9 @@ private='github\.com/BugSplat-Git/(bugsplat-rs|bugsplat-native)\b'
 for crate in bugsplat-sys bugsplat tauri-plugin-bugsplat; do
   dir=$(cargo metadata --no-deps --format-version 1 |
         python3 -c "import json,sys; print([p['manifest_path'] for p in json.load(sys.stdin)['packages'] if p['name']=='$crate'][0].rsplit('/',1)[0])")
+  # Captured first: a failing listing must stop the script, and it wouldn't from a
+  # process substitution feeding the loop.
+  files=$(cargo package --list -p "$crate" --allow-dirty)
   while IFS= read -r f; do
     case "$f" in Cargo.toml.orig|.cargo_vcs_info.json|Cargo.lock) continue ;; esac
     # bugsplat-native's own README and CMake may name its repository; only bugsplat-rs's
@@ -41,7 +44,7 @@ for crate in bugsplat-sys bugsplat tauri-plugin-bugsplat; do
       grep -nE "$private" "$src" >&2
       fail=1
     fi
-  done < <(cargo package --list -p "$crate" --allow-dirty)
+  done <<<"$files"
 done
 
 # The manifest links crates.io shows (members inherit these from the workspace).
