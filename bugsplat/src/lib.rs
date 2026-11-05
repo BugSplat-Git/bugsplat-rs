@@ -1,6 +1,6 @@
 //! Crash reporting for Rust applications with [BugSplat](https://www.bugsplat.com).
 //!
-//! Built on [bugsplat-native](https://github.com/BugSplat-Git/bugsplat-native): crashes (segfaults,
+//! Built on bugsplat-native, BugSplat's native SDK: crashes (segfaults,
 //! aborts, stack overflows) are captured out of process by Crashpad via `BugSplatMonitor`, shown to
 //! the user by `BugSplatReporter` and uploaded as minidumps. Rust panics are reported too (see
 //! [`panic`]). Upload symbols with `symbol-upload -m` so the server can symbolicate.

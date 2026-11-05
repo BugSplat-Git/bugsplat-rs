@@ -6,7 +6,8 @@ members = ["bugsplat-sys", "bugsplat", "tauri-plugin-bugsplat", "examples/crashe
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/BugSplat-Git/bugsplat-rs"
+# The repository is private for now, so the crates point at the docs instead.
+homepage = "https://docs.bugsplat.com/integrations/desktop/rust"
 authors = ["BugSplat <support@bugsplat.com>"]
 rust-version = "1.81"
 

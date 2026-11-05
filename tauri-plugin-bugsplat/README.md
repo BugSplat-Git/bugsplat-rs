@@ -4,4 +4,4 @@
 via the [`bugsplat`](https://crates.io/crates/bugsplat) crate, plus uncaught JavaScript errors and
 unhandled promise rejections from every webview.
 
-See the [bugsplat-rs README](https://github.com/BugSplat-Git/bugsplat-rs#tauri) for setup.
+See the [setup guide](https://docs.bugsplat.com/integrations/desktop/rust) or the [`bugsplat` README](https://crates.io/crates/bugsplat) for setup.

@@ -46,8 +46,11 @@ jobs:
         env:
           DOCS_RS: "1"
           BUGSPLAT_NATIVE_SRC: /nonexistent
-      - name: cargo package (builds each crate from its .crate, as crates.io users will)
+      - name: package contents (only what the build needs, no private links)
         if: runner.os == 'Linux'
+        run: scripts/check-package.sh
+      # On every OS: bugsplat-sys's include list must cover each platform's build.
+      - name: cargo package (builds each crate from its .crate, as crates.io users will)
         run: cargo package --workspace
         env:
           BUGSPLAT_CRASHPAD_CACHE: ${{ github.workspace }}/.crashpad-cache
