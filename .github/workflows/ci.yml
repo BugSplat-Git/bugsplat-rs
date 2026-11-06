@@ -51,6 +51,8 @@ jobs:
         run: scripts/check-package.sh
       # On every OS: bugsplat-sys's include list must cover each platform's build.
       - name: cargo package (builds each crate from its .crate, as crates.io users will)
-        run: cargo package --workspace
+        # my-tauri-crasher is a sample app, not a crate: its frontend sits outside the crate
+        # directory, so it cannot be built from a .crate (and it is publish = false).
+        run: cargo package --workspace --exclude my-tauri-crasher
         env:
           BUGSPLAT_CRASHPAD_CACHE: ${{ github.workspace }}/.crashpad-cache

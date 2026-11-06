@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["bugsplat-sys", "bugsplat", "tauri-plugin-bugsplat", "examples/crasher"]
+members = ["bugsplat-sys", "bugsplat", "tauri-plugin-bugsplat", "examples/crasher", "examples/my-tauri-crasher/src-tauri"]
 
 [workspace.package]
 version = "0.1.0"

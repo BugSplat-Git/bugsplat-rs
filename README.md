@@ -123,6 +123,9 @@ BUGSPLAT_DATABASE=my-db cargo run -p crasher -- segv      # also: abort, stack-o
                                                           # panic-thread, panic-ffi, capture, js
 ```
 
+`examples/my-tauri-crasher` is a sample Tauri app with a button for each kind of failure: a native
+crash, a Rust panic, and JavaScript errors. See its README.
+
 ## Third-party licenses
 
 bugsplat-rs is MIT. An app that ships `BugSplatMonitor` and `BugSplatReporter` also redistributes

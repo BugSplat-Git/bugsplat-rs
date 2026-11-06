@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8"/>
+        <title>my-tauri-crasher</title>
+        <link rel="stylesheet" href="./assets/css/styles.css">
+    </head>
+    <body>
+        <div class="container">
+            <a class="external" href="https://www.bugsplat.com"><img class="logo" src="./assets/img/bugsplat-logo.png" alt="BugSplat"></a>
+
+            <div class="content">
+                <h1>
+                    Welcome to my-tauri-crasher!
+                </h1>
+                <p>
+                    This is a sample application that demonstrates <a class="external" href="https://www.bugsplat.com">BugSplat</a>
+                    crash and error reporting for <a class="external" href="https://tauri.app">Tauri</a> applications built with
+                    Rust and JavaScript.
+                </p>
+                <div class="errors">
+                    <h2>Errors</h2>
+                    <button class="error" id="native-crash-button">
+                        <h2>Native Crash</h2>
+                        <p>writes through a null pointer in Rust</p>
+                        <h4>WILL TERMINATE APP</h4>
+                    </button>
+                    <button class="error" id="rust-panic-button">
+                        <h2>Rust Panic</h2>
+                        <p>indexes past the end of a vector</p>
+                        <h4>WILL TERMINATE APP</h4>
+                    </button>
+                    <button class="error" id="js-error-button">
+                        <h2>JavaScript Error</h2>
+                        <p>uncaught exception</p>
+                    </button>
+                    <button class="error" id="js-rejection-button">
+                        <h2>Unhandled Rejection</h2>
+                        <p>rejected promise nobody awaits</p>
+                    </button>
+                    <button class="error" id="js-post-button">
+                        <h2>Handled Error</h2>
+                        <p>caught and posted with window.BugSplat.post</p>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <script src="./main.js"></script>
+    </body>
+</html>
