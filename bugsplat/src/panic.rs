@@ -8,13 +8,16 @@
 //! 2. Tags the next dump `panic` and calls `bugsplat_capture_report`, which writes a minidump of
 //!    the live process out of process, synchronously, with the panicking thread on top.
 //! 3. Clears the attributes so they cannot leak into a later, unrelated report.
-//! 4. If the process is certain to abort next (`panic = "abort"`, or the "panic in a function
-//!    that cannot unwind" re-panic Rust raises when an unwind hits an `extern "C"` boundary, as in
-//!    Tauri commands invoked from Objective-C), tags the following dump `panic-duplicate`, which
-//!    BugSplatMonitor discards, so one panic produces one report.
+//! 4. Tags the following dump `panic-duplicate`, which BugSplatMonitor discards, so one panic
+//!    produces one report. When the process is certain to abort next (`panic = "abort"`, or the
+//!    "panic in a function that cannot unwind" re-panic Rust raises when an unwind hits an
+//!    `extern "C"` boundary), the tag stays. Otherwise it is provisional: the unwind can still
+//!    fail outright with no re-panic ("failed to initiate panic", as in a Tauri command invoked
+//!    from Objective-C on macOS) and abort straight away, so the tag covers that abort and is
+//!    cleared after `REPANIC_WINDOW` if the process carries on instead.
 
 use std::panic::{self, PanicHookInfo};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Mutex, Once};
 use std::time::{Duration, Instant};
 
@@ -31,6 +34,48 @@ pub const ATTR_THREAD: &str = "rust.panic.thread";
 static INSTALL: Once = Once::new();
 static REPORTED: AtomicUsize = AtomicUsize::new(0);
 static LAST_CAPTURE: Mutex<Option<Instant>> = Mutex::new(None);
+static DUPLICATE_TAG: DuplicateTag = DuplicateTag::new();
+
+/// Who owns the `panic-duplicate` tag on the next dump. Each tagging takes a new generation, so a
+/// provisional tag's expiry clears it only if nothing has tagged the next dump since.
+pub(crate) struct DuplicateTag {
+    generation: AtomicU64,
+}
+
+impl DuplicateTag {
+    pub(crate) const fn new() -> Self {
+        Self { generation: AtomicU64::new(0) }
+    }
+
+    /// Takes the tag; returns the generation that owns it.
+    pub(crate) fn take(&self) -> u64 {
+        self.generation.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    /// Whether `generation` still owns the tag, so its expiry may clear it.
+    pub(crate) fn still_owned_by(&self, generation: u64) -> bool {
+        self.generation.load(Ordering::SeqCst) == generation
+    }
+}
+
+/// Tags the next dump as a duplicate of the panic just captured. A provisional tag is cleared
+/// after `REPANIC_WINDOW` unless something has tagged the next dump since.
+fn tag_next_dump_duplicate(provisional: bool) {
+    let generation = DUPLICATE_TAG.take();
+    let _ = crate::set_next_report_kind(Some("panic-duplicate"));
+    if !provisional {
+        return;
+    }
+    // If the thread cannot be spawned the tag simply stays, which at worst drops one later dump.
+    let _ = std::thread::Builder::new()
+        .name("bugsplat-panic-duplicate".into())
+        .spawn(move || {
+            std::thread::sleep(REPANIC_WINDOW);
+            if DUPLICATE_TAG.still_owned_by(generation) {
+                let _ = crate::set_next_report_kind(None);
+            }
+        });
+}
 
 /// Messages Rust uses when a panic cannot unwind; the process aborts right after the hook.
 const NOUNWIND_MESSAGES: &[&str] = &[
@@ -113,9 +158,7 @@ fn report(info: &PanicHookInfo<'_>) {
 
     match action {
         Action::Skip => {}
-        Action::SuppressAbort => {
-            let _ = crate::set_next_report_kind(Some("panic-duplicate"));
-        }
+        Action::SuppressAbort => tag_next_dump_duplicate(false),
         Action::Capture { abort_follows } => {
             REPORTED.fetch_add(1, Ordering::Relaxed);
             let location = info
@@ -133,9 +176,7 @@ fn report(info: &PanicHookInfo<'_>) {
                 let _ = crate::set_attribute(name, None);
             }
             *last = Some(Instant::now());
-            if abort_follows {
-                let _ = crate::set_next_report_kind(Some("panic-duplicate"));
-            }
+            tag_next_dump_duplicate(!abort_follows);
         }
     }
 }
@@ -178,6 +219,18 @@ mod tests {
             decide("panic in a function that cannot unwind", 1, stale, false),
             Action::Capture { abort_follows: true }
         );
+    }
+
+    #[test]
+    fn provisional_tag_expires_only_while_it_owns_the_tag() {
+        let tag = DuplicateTag::new();
+        let first = tag.take();
+        assert!(tag.still_owned_by(first));
+
+        // A later panic re-tagged the next dump: the first tag's expiry must leave it alone.
+        let second = tag.take();
+        assert!(!tag.still_owned_by(first));
+        assert!(tag.still_owned_by(second));
     }
 
     #[test]
