@@ -14,18 +14,25 @@
 //!    `extern "C"` boundary), the tag stays. Otherwise it is provisional: the unwind can still
 //!    fail outright with no re-panic ("failed to initiate panic", as in a Tauri command invoked
 //!    from Objective-C on macOS) and abort straight away, so the tag covers that abort and is
-//!    cleared after `REPANIC_WINDOW` if the process carries on instead.
+//!    cleared `PROVISIONAL_WINDOW` after the hook chain returns if the process carries on instead.
+//!    An explicit [`crate::capture_report`] is always filed as `capture`, and the SDK clears the
+//!    next dump's kind after it, so it puts back any duplicate tag still pending.
 
 use std::panic::{self, PanicHookInfo};
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Mutex, Once};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, MutexGuard, Once};
 use std::time::{Duration, Instant};
 
 /// Panic reports per process; a panic storm should not flood the database.
 const MAX_PANIC_REPORTS: usize = 8;
 /// A nounwind re-panic within this window of a captured panic is the same failure.
 const REPANIC_WINDOW: Duration = Duration::from_secs(5);
+/// How long a provisional `panic-duplicate` tag outlives the hook chain. An unwind that cannot
+/// start aborts as soon as the hooks return, so this only needs to cover scheduling delays; any
+/// unrelated crash inside it is discarded, so keep it short.
+const PROVISIONAL_WINDOW: Duration = Duration::from_secs(1);
 const MAX_MESSAGE_BYTES: usize = 4096;
+const DUPLICATE_KIND: &str = "panic-duplicate";
 
 pub const ATTR_MESSAGE: &str = "rust.panic.message";
 pub const ATTR_LOCATION: &str = "rust.panic.location";
@@ -33,48 +40,81 @@ pub const ATTR_THREAD: &str = "rust.panic.thread";
 
 static INSTALL: Once = Once::new();
 static REPORTED: AtomicUsize = AtomicUsize::new(0);
-static LAST_CAPTURE: Mutex<Option<Instant>> = Mutex::new(None);
-static DUPLICATE_TAG: DuplicateTag = DuplicateTag::new();
+/// Serializes the hook, provisional-tag expiry and explicit captures, which all set the kind of
+/// the next dump.
+static STATE: Mutex<State> = Mutex::new(State::new());
 
-/// Who owns the `panic-duplicate` tag on the next dump. Each tagging takes a new generation, so a
-/// provisional tag's expiry clears it only if nothing has tagged the next dump since.
-pub(crate) struct DuplicateTag {
-    generation: AtomicU64,
+fn state() -> MutexGuard<'static, State> {
+    // A poisoned lock still works.
+    STATE.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-impl DuplicateTag {
+pub(crate) struct State {
+    last_capture: Option<Instant>,
+    generation: u64,
+    /// The `panic-duplicate` tag on the next dump, if there is one.
+    tag: Option<Tag>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct Tag {
+    generation: u64,
+    provisional: bool,
+}
+
+impl State {
     pub(crate) const fn new() -> Self {
-        Self { generation: AtomicU64::new(0) }
+        Self { last_capture: None, generation: 0, tag: None }
     }
 
-    /// Takes the tag; returns the generation that owns it.
-    pub(crate) fn take(&self) -> u64 {
-        self.generation.fetch_add(1, Ordering::SeqCst) + 1
+    /// Records that the next dump is tagged a duplicate; returns the tag's generation.
+    pub(crate) fn tag_duplicate(&mut self, provisional: bool) -> u64 {
+        self.generation += 1;
+        self.tag = Some(Tag { generation: self.generation, provisional });
+        self.generation
     }
 
-    /// Whether `generation` still owns the tag, so its expiry may clear it.
-    pub(crate) fn still_owned_by(&self, generation: u64) -> bool {
-        self.generation.load(Ordering::SeqCst) == generation
+    /// Ends the provisional tag `generation`. True when it was still on the next dump and must be
+    /// cleared; false when something has tagged the next dump since.
+    pub(crate) fn expire(&mut self, generation: u64) -> bool {
+        if self.tag == Some(Tag { generation, provisional: true }) {
+            self.tag = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Whether the next dump is tagged a duplicate, so an explicit capture must put the tag back.
+    pub(crate) fn tagged(&self) -> bool {
+        self.tag.is_some()
     }
 }
 
-/// Tags the next dump as a duplicate of the panic just captured. A provisional tag is cleared
-/// after `REPANIC_WINDOW` unless something has tagged the next dump since.
-fn tag_next_dump_duplicate(provisional: bool) {
-    let generation = DUPLICATE_TAG.take();
-    let _ = crate::set_next_report_kind(Some("panic-duplicate"));
-    if !provisional {
-        return;
-    }
+/// Clears a provisional tag after `PROVISIONAL_WINDOW`, under the lock the hook tags with, so it
+/// can never clear a newer panic's tag.
+fn expire_after_window(generation: u64) {
     // If the thread cannot be spawned the tag simply stays, which at worst drops one later dump.
     let _ = std::thread::Builder::new()
         .name("bugsplat-panic-duplicate".into())
         .spawn(move || {
-            std::thread::sleep(REPANIC_WINDOW);
-            if DUPLICATE_TAG.still_owned_by(generation) {
+            std::thread::sleep(PROVISIONAL_WINDOW);
+            let mut state = state();
+            if state.expire(generation) {
                 let _ = crate::set_next_report_kind(None);
             }
         });
+}
+
+/// [`crate::capture_report`]: the SDK files the capture as `capture` and then clears the next
+/// dump's kind, which would let the abort a panic tag covers be reported twice. Put the tag back.
+pub(crate) fn capture_explicit(kind: Option<&str>) -> Result<(), crate::Error> {
+    let state = state();
+    let result = crate::capture_now(kind);
+    if state.tagged() {
+        let _ = crate::set_next_report_kind(Some(DUPLICATE_KIND));
+    }
+    result
 }
 
 /// Messages Rust uses when a panic cannot unwind; the process aborts right after the hook.
@@ -87,8 +127,12 @@ pub(crate) fn install() {
     INSTALL.call_once(|| {
         let previous = panic::take_hook();
         panic::set_hook(Box::new(move |info| {
-            report(info);
+            let provisional = report(info);
             previous(info);
+            // Timed from here: the default hook can spend a while printing a backtrace.
+            if let Some(generation) = provisional {
+                expire_after_window(generation);
+            }
         }));
     });
 }
@@ -142,23 +186,28 @@ pub(crate) fn truncate(s: &str, max: usize) -> &str {
     &s[..end]
 }
 
-fn report(info: &PanicHookInfo<'_>) {
+/// Returns the generation of a provisional duplicate tag, which the caller expires.
+fn report(info: &PanicHookInfo<'_>) -> Option<u64> {
     if !crate::is_initialized() {
-        return;
+        return None;
     }
     let message = message(info);
-    // Serialize reports from concurrent panics; a poisoned lock still works.
-    let mut last = LAST_CAPTURE.lock().unwrap_or_else(|e| e.into_inner());
+    // Serialize reports from concurrent panics.
+    let mut state = state();
     let action = decide(
         message,
         REPORTED.load(Ordering::Relaxed),
-        last.map(|t| t.elapsed()),
+        state.last_capture.map(|t| t.elapsed()),
         cfg!(panic = "abort"),
     );
 
     match action {
-        Action::Skip => {}
-        Action::SuppressAbort => tag_next_dump_duplicate(false),
+        Action::Skip => None,
+        Action::SuppressAbort => {
+            state.tag_duplicate(false);
+            let _ = crate::set_next_report_kind(Some(DUPLICATE_KIND));
+            None
+        }
         Action::Capture { abort_follows } => {
             REPORTED.fetch_add(1, Ordering::Relaxed);
             let location = info
@@ -171,12 +220,14 @@ fn report(info: &PanicHookInfo<'_>) {
             let _ = crate::set_attribute(ATTR_MESSAGE, Some(truncate(message, MAX_MESSAGE_BYTES)));
             let _ = crate::set_attribute(ATTR_LOCATION, Some(&location));
             let _ = crate::set_attribute(ATTR_THREAD, Some(thread));
-            let _ = crate::capture_report(Some("panic"));
+            let _ = crate::capture_now(Some("panic"));
             for name in [ATTR_MESSAGE, ATTR_LOCATION, ATTR_THREAD] {
                 let _ = crate::set_attribute(name, None);
             }
-            *last = Some(Instant::now());
-            tag_next_dump_duplicate(!abort_follows);
+            state.last_capture = Some(Instant::now());
+            let generation = state.tag_duplicate(!abort_follows);
+            let _ = crate::set_next_report_kind(Some(DUPLICATE_KIND));
+            (!abort_follows).then_some(generation)
         }
     }
 }
@@ -223,14 +274,37 @@ mod tests {
 
     #[test]
     fn provisional_tag_expires_only_while_it_owns_the_tag() {
-        let tag = DuplicateTag::new();
-        let first = tag.take();
-        assert!(tag.still_owned_by(first));
+        let mut state = State::new();
+        let first = state.tag_duplicate(true);
 
         // A later panic re-tagged the next dump: the first tag's expiry must leave it alone.
-        let second = tag.take();
-        assert!(!tag.still_owned_by(first));
-        assert!(tag.still_owned_by(second));
+        let second = state.tag_duplicate(true);
+        assert!(!state.expire(first));
+        assert!(state.expire(second));
+        // Expired once; a second expiry has nothing to clear.
+        assert!(!state.expire(second));
+    }
+
+    #[test]
+    fn certain_abort_tag_never_expires() {
+        let mut state = State::new();
+        let provisional = state.tag_duplicate(true);
+        // A nounwind re-panic makes the abort certain: the earlier provisional expiry must not
+        // clear the tag that covers it.
+        let certain = state.tag_duplicate(false);
+        assert!(!state.expire(provisional));
+        assert!(!state.expire(certain));
+        assert!(state.tagged());
+    }
+
+    #[test]
+    fn explicit_captures_restore_a_pending_tag_until_it_expires() {
+        let mut state = State::new();
+        assert!(!state.tagged());
+        let provisional = state.tag_duplicate(true);
+        assert!(state.tagged());
+        assert!(state.expire(provisional));
+        assert!(!state.tagged());
     }
 
     #[test]

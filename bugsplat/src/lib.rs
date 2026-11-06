@@ -228,6 +228,11 @@ pub fn set_next_report_kind(kind: Option<&str>) -> Result<(), Error> {
 
 /// Writes a minidump of the running process and reports it without crashing.
 pub fn capture_report(kind: Option<&str>) -> Result<(), Error> {
+    panic::capture_explicit(kind)
+}
+
+/// `capture_report` without the panic hook's bookkeeping; the hook itself captures through this.
+pub(crate) fn capture_now(kind: Option<&str>) -> Result<(), Error> {
     if kind.is_some() {
         set_next_report_kind(kind)?;
     }
