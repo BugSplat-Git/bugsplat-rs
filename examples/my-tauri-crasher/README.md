@@ -27,18 +27,24 @@ npm install
 npm run dev     # debug build; crashes go to BugSplat's public fred database
 ```
 
-Reports go to `fred` unless `BUGSPLAT_DATABASE` names your database. `BUGSPLAT_QUIET=1` uploads
-without showing the crash dialog.
+Reports go to `fred` unless `BUGSPLAT_DATABASE` names your database. The app reads it when it starts
+(`bugsplat_options()` in `src-tauri/src/lib.rs`); it is not built in, so set it where you launch the
+app. `BUGSPLAT_QUIET=1` uploads without showing the crash dialog.
 
 ## Symbols
 
-Build a release, then upload its symbols so BugSplat can show Rust function names, files and line
-numbers:
+Build a release, upload its symbols so BugSplat can show Rust function names, files and line
+numbers, then run it against the same database:
 
 ```sh
-BUGSPLAT_DATABASE=your-bugsplat-database npm run build
-SYMBOL_UPLOAD_CLIENT_ID=... SYMBOL_UPLOAD_CLIENT_SECRET=... BUGSPLAT_DATABASE=your-bugsplat-database npm run symbols
+export BUGSPLAT_DATABASE=your-bugsplat-database
+npm run build
+SYMBOL_UPLOAD_CLIENT_ID=... SYMBOL_UPLOAD_CLIENT_SECRET=... npm run symbols
+../../target/release/bundle/macos/my-tauri-crasher.app/Contents/MacOS/my-tauri-crasher
 ```
+
+Launched from Finder instead, the app gets no `BUGSPLAT_DATABASE` and reports to `fred`, which won't
+have your symbols.
 
 `npm run symbols` uploads `my-tauri-crasher.dSYM` from the workspace's `target/release` (macOS).
 See the guide for Windows (`.pdb`) and Linux (`.debug`). Create client credentials on the
