@@ -1,0 +1,17 @@
+{
+  "name": "my-tauri-crasher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sample Tauri application integrated with BugSplat for crash and error reporting",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "symbols": "symbol-upload -b \"${BUGSPLAT_DATABASE:-fred}\" -a my-tauri-crasher -v $npm_package_version -d ../../target/release -f \"my-tauri-crasher.dSYM\" -m -i \"$SYMBOL_UPLOAD_CLIENT_ID\" -s \"$SYMBOL_UPLOAD_CLIENT_SECRET\""
+  },
+  "devDependencies": {
+    "@bugsplat/symbol-upload": "^11.0.1",
+    "@tauri-apps/cli": "^2.12.4"
+  },
+  "author": "BugSplat",
+  "license": "MIT"
+}
