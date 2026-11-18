@@ -318,7 +318,7 @@ dependencies = [
 
 [[package]]
 name = "bugsplat"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bugsplat-sys",
  "serde",
@@ -329,7 +329,7 @@ dependencies = [
 
 [[package]]
 name = "bugsplat-sys"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cmake",
 ]
@@ -573,7 +573,7 @@ dependencies = [
 
 [[package]]
 name = "crasher"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bugsplat",
  "serde_json",
@@ -2105,7 +2105,7 @@ dependencies = [
 
 [[package]]
 name = "my-tauri-crasher"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bugsplat",
  "tauri",
@@ -3588,7 +3588,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-bugsplat"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bugsplat",
  "bugsplat-sys",
