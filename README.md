@@ -46,14 +46,13 @@ bugsplat-native's CMake; set `BUGSPLAT_CRASHPAD_CACHE` to share it across target
 
 On Linux:
 
-- **glibc 2.38 or newer** (Debian 13, Ubuntu 24.04, Fedora 39 and later), to build and to run.
-  The Crashpad prebuilt is built on Ubuntu 24.04, so its libraries and `crashpad_handler` use
-  glibc 2.38's C23 functions (`__isoc23_strtol` and others). On older systems the link fails
-  with undefined references to them.
+- **glibc 2.35 or newer** (Ubuntu 22.04, Debian 12, Fedora 36, RHEL 10 and later), to build and to run.
+  The Crashpad prebuilt is built on Ubuntu 22.04 and checked to need nothing newer than
+  `GLIBC_2.35`. On older systems the link fails with undefined references to newer glibc symbols.
 - **GCC 13 or newer, or Clang.** Crashpad's minidump headers declare
   `struct alignas(4) __attribute__((packed))`, which GCC 12 and older reject ("expected
-  identifier before '__attribute__'"). Set `CC=clang CXX=clang++` where the default GCC is
-  older.
+  identifier before '__attribute__'"). Ubuntu 22.04 and Debian 12 ship GCC 11 and 12, so install
+  Clang there (`apt install clang`) and set `CC=clang CXX=clang++`.
 
 ### Symbols
 
