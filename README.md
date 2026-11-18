@@ -41,8 +41,19 @@ fn main() {
 ```
 
 Requirements: CMake ≥ 3.22 and Ninja (required on Windows), a C++20 compiler (Xcode 15+, MSVC
-toolset 14.44+, clang 15+/gcc 11+). The pinned Crashpad prebuilt is downloaded and verified by
+toolset 14.44+, clang 15+/gcc 13+). The pinned Crashpad prebuilt is downloaded and verified by
 bugsplat-native's CMake; set `BUGSPLAT_CRASHPAD_CACHE` to share it across target directories.
+
+On Linux:
+
+- **glibc 2.38 or newer** (Debian 13, Ubuntu 24.04, Fedora 39 and later), to build and to run.
+  The Crashpad prebuilt is built on Ubuntu 24.04, so its libraries and `crashpad_handler` use
+  glibc 2.38's C23 functions (`__isoc23_strtol` and others). On older systems the link fails
+  with undefined references to them.
+- **GCC 13 or newer, or Clang.** Crashpad's minidump headers declare
+  `struct alignas(4) __attribute__((packed))`, which GCC 12 and older reject ("expected
+  identifier before '__attribute__'"). Set `CC=clang CXX=clang++` where the default GCC is
+  older.
 
 ### Symbols
 
