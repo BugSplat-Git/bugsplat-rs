@@ -39,6 +39,35 @@ pub enum HangPolicy {
     ReportAndTerminate,
 }
 
+/// The crash type posted with each dump, which decides the symbol format you upload.
+///
+/// Rust apps post [`CrashType::Crashpad`] on every platform by default, so one set of Breakpad
+/// `.sym` files (from `symbol-upload -m`) symbolicates macOS, Linux and Windows crashes alike.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CrashType {
+    /// Crashpad minidump (type 5). Upload Breakpad `.sym` files.
+    #[default]
+    Crashpad,
+    /// Windows native minidump (type 1). Upload the `.pdb` files and the matching `.exe`/`.dll`
+    /// without `-m`. On other platforms this is ignored and the platform's type is used.
+    WindowsNative,
+    /// Any other numeric BugSplat crash type id. `Id(0)` means the native SDK's platform default.
+    Id(i32),
+}
+
+impl CrashType {
+    /// The numeric id posted to BugSplat, or `None` for the native SDK's platform default.
+    fn id(self) -> Option<i32> {
+        match self {
+            CrashType::Crashpad => Some(5),
+            CrashType::WindowsNative if cfg!(windows) => Some(1),
+            CrashType::WindowsNative => None,
+            CrashType::Id(0) => None,
+            CrashType::Id(id) => Some(id),
+        }
+    }
+}
+
 /// Configuration for [`crate::init`].
 #[derive(Debug, Clone)]
 pub struct Options {
@@ -47,6 +76,7 @@ pub struct Options {
     pub(crate) version: String,
     pub(crate) upload_policy: UploadPolicy,
     pub(crate) dump_type: DumpType,
+    pub(crate) crash_type: CrashType,
     pub(crate) hang: Option<(Duration, HangPolicy)>,
     pub(crate) store_dir: Option<PathBuf>,
     pub(crate) monitor_path: Option<PathBuf>,
@@ -77,6 +107,7 @@ impl Options {
             version: version.into(),
             upload_policy: UploadPolicy::default(),
             dump_type: DumpType::default(),
+            crash_type: CrashType::default(),
             hang: None,
             store_dir: None,
             monitor_path: None,
@@ -102,6 +133,12 @@ impl Options {
 
     pub fn dump_type(mut self, dump_type: DumpType) -> Self {
         self.dump_type = dump_type;
+        self
+    }
+
+    /// The crash type posted with each dump (default [`CrashType::Crashpad`] on every platform).
+    pub fn crash_type(mut self, crash_type: CrashType) -> Self {
+        self.crash_type = crash_type;
         self
     }
 
@@ -233,6 +270,9 @@ impl Options {
                     DumpType::Full => sys::bugsplat_dump_type::BUGSPLAT_DUMP_FULL,
                 },
             );
+            if let Some(id) = self.crash_type.id() {
+                sys::bugsplat_options_set_crash_type_id(o, id);
+            }
             if let Some((timeout, policy)) = self.hang {
                 let ms = i32::try_from(timeout.as_millis()).unwrap_or(i32::MAX).max(1);
                 sys::bugsplat_options_set_hang_detection(
@@ -332,4 +372,42 @@ impl NativeStrings {
 pub(crate) fn path_cstring(path: &Path) -> Result<CString, Error> {
     let s = path.to_str().ok_or(Error::InvalidArgument)?;
     Ok(CString::new(s)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn posted_id(o: &Options) -> Option<i32> {
+        o.crash_type.id()
+    }
+
+    #[test]
+    fn crashpad_is_the_default_on_every_platform() {
+        // Windows included: the native SDK would otherwise post 1, which reads PDBs and ignores
+        // the .sym files the README tells Rust developers to upload.
+        assert_eq!(posted_id(&Options::new("db", "app", "1.0")), Some(5));
+    }
+
+    #[test]
+    fn windows_native_is_opt_in_and_only_applies_on_windows() {
+        let o = Options::new("db", "app", "1.0").crash_type(CrashType::WindowsNative);
+        assert_eq!(posted_id(&o), if cfg!(windows) { Some(1) } else { None });
+    }
+
+    #[test]
+    fn explicit_id_wins_and_zero_means_the_native_default() {
+        let o = Options::new("db", "app", "1.0").crash_type(CrashType::Id(8));
+        assert_eq!(posted_id(&o), Some(8));
+        let o = Options::new("db", "app", "1.0").crash_type(CrashType::Id(0));
+        assert_eq!(posted_id(&o), None);
+    }
+
+    #[test]
+    fn native_options_build_with_a_crash_type() {
+        for t in [CrashType::Crashpad, CrashType::WindowsNative, CrashType::Id(0), CrashType::Id(27)] {
+            let o = Options::new("db", "app", "1.0").crash_type(t).to_native(None).unwrap();
+            unsafe { sys::bugsplat_options_free(o) };
+        }
+    }
 }

@@ -47,5 +47,6 @@ Launched from Finder instead, the app gets no `BUGSPLAT_DATABASE` and reports to
 have your symbols.
 
 `npm run symbols` uploads `my-tauri-crasher.dSYM` from the workspace's `target/release` (macOS).
-See the guide for Windows (`.pdb`) and Linux (`.debug`). Create client credentials on the
-[Integrations](https://app.bugsplat.com/v2/settings/database/integrations) page.
+On Windows and Linux, point `-f` at `my-tauri-crasher.pdb` or `my-tauri-crasher.debug` and keep
+`-m`; the [repository README](../../README.md#symbols) has the details. Create client credentials on
+the [Integrations](https://app.bugsplat.com/v2/settings/database/integrations) page.

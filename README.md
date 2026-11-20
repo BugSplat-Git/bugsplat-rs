@@ -73,10 +73,17 @@ split-debuginfo = "packed"   # macOS: writes myapp.dSYM
 | Windows | `target/release/myapp.pdb` | Always written by MSVC |
 
 ```sh
+# macOS
 npx @bugsplat/symbol-upload -b my-database -a MyApp -v 1.2.3 -d target/release -f "myapp.dSYM" -m
+# Windows
+npx @bugsplat/symbol-upload -b my-database -a MyApp -v 1.2.3 -d target/release -f "myapp.pdb" -m
 ```
 
 `application` and `version` must match the values passed to `Options::new`.
+
+The crate posts every crash as a Crashpad minidump (`CrashType::Crashpad`), Windows included, so the
+same `.sym` files work on all three platforms. To have Windows crashes read `.pdb` files instead,
+set `.crash_type(bugsplat::CrashType::WindowsNative)` and upload the `.pdb` and `.exe` without `-m`.
 
 ### Packaging the helpers
 
