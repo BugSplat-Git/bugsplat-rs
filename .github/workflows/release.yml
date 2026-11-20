@@ -1,0 +1,117 @@
+# Publishes bugsplat-sys, bugsplat and tauri-plugin-bugsplat to crates.io and creates the GitHub
+# release. See RELEASING.md.
+#
+# crates.io's trusted publisher configuration names this file (release.yml) and the `release`
+# environment; renaming either breaks publishing until the configuration is updated.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Check and rehearse only. Turn off, on a v* tag, to publish (e.g. to finish a failed release).
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Fails fast, before the CI matrix: the tag must name the workspace version, and the crates must
+  # package (`cargo publish --dry-run`, without building them; CI builds them below).
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          # bugsplat-native is private until it is published; a token with read access is needed.
+          token: ${{ secrets.BUGSPLAT_NATIVE_TOKEN || github.token }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Version
+        id: version
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version=$(scripts/publish-crates.sh check "$GITHUB_REF_NAME")
+          elif [ "$DRY_RUN" = true ]; then
+            version=$(scripts/publish-crates.sh check)
+          else
+            echo "::error::Publishing runs only from a v* tag. Run the workflow on a tag, or turn on dry-run."
+            exit 1
+          fi
+          publish=true
+          [ "$DRY_RUN" = true ] && publish=false
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "Version $version (publish: $publish)"
+      - name: Plan (what is already on crates.io; cargo publish --dry-run for the rest)
+        run: scripts/publish-crates.sh plan
+
+  # The full CI matrix on this commit: tests and clippy on Linux, macOS and Windows, and `cargo
+  # package`, which builds each crate from its .crate as `cargo publish` would.
+  ci:
+    needs: prepare
+    uses: ./.github/workflows/ci.yml
+    secrets:
+      BUGSPLAT_NATIVE_TOKEN: ${{ secrets.BUGSPLAT_NATIVE_TOKEN }}
+
+  # The only job that can get a crates.io token. It runs no build scripts (--no-verify; CI built
+  # the crates), and finishes well inside the token's 30-minute lifetime.
+  publish:
+    needs: [prepare, ci]
+    if: needs.prepare.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # trusted publishing: exchanged for a short-lived crates.io token
+    env:
+      # A CARGO_REGISTRY_TOKEN secret, if one is set, is used instead of trusted publishing (needed
+      # only for a crate's first publish; see RELEASING.md).
+      USE_TOKEN_SECRET: ${{ secrets.CARGO_REGISTRY_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.BUGSPLAT_NATIVE_TOKEN || github.token }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: crates.io token (trusted publishing)
+        id: auth
+        if: env.USE_TOKEN_SECRET != 'true'
+        uses: rust-lang/crates-io-auth-action@v1
+      - name: Publish (skips versions already on crates.io)
+        run: scripts/publish-crates.sh publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token || secrets.CARGO_REGISTRY_TOKEN }}
+
+  github-release:
+    needs: [prepare, publish]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: GitHub release with generated notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG already exists"
+            exit 0
+          fi
+          prerelease=()
+          case "$VERSION" in *-*) prerelease=(--prerelease) ;; esac
+          gh release create "$TAG" --verify-tag --generate-notes --title "$TAG" "${prerelease[@]}"
