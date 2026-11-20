@@ -59,9 +59,14 @@ mod tests {
     fn wer_helper_was_built_and_copied_next_to_executables() {
         let path = BUILT_WER_PATH.expect("build script exports wer= on Windows");
         assert!(std::path::Path::new(path).exists(), "{path} missing");
-        // Test binaries run from target/<profile>/deps, one of the directories build.rs copies to.
+        // build.rs copies it into the profile directory (target/<profile>, marked by Cargo's
+        // .cargo-lock), where `cargo run` starts executables. Test binaries live below it.
         let exe = std::env::current_exe().unwrap();
-        let copy = exe.parent().unwrap().join("BugSplatWer.dll");
+        let profile_dir = exe
+            .ancestors()
+            .find(|dir| dir.join(".cargo-lock").exists())
+            .expect("test binary runs inside a Cargo profile directory");
+        let copy = profile_dir.join("BugSplatWer.dll");
         assert!(copy.exists(), "{} missing", copy.display());
     }
 

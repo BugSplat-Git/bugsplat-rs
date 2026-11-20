@@ -110,7 +110,7 @@ the DLL **next to the executable** and logs `BugSplatWer.dll not found next to t
 it is missing. Two things are needed:
 
 1. **Ship `BugSplatWer.dll` next to your `.exe`.** `cargo build` and `cargo run` copy it into
-   `target/<profile>/` (and its `examples/` and `deps/`) for you; your installer must put it next
+   `target/<profile>/` (and its `examples/`) for you; your installer must put it next
    to the installed `.exe` (for Tauri, see below).
 2. **Allow-list its full path.** WER calls only helpers listed under
    `SOFTWARE\Microsoft\Windows\Windows Error Reporting\RuntimeExceptionHelperModules` as a
