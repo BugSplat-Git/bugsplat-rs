@@ -88,14 +88,45 @@ set `.crash_type(bugsplat::CrashType::WindowsNative)` and upload the `.pdb` and 
 ### Packaging the helpers
 
 `BugSplatMonitor` (captures crashes) and `BugSplatReporter` (dialog and upload) are separate
-executables that ship with your app. `bugsplat-sys` builds them. Cargo passes their paths only to
-the build scripts of crates that depend on `bugsplat-sys` directly, so add it to your
-`[dependencies]` next to `bugsplat` and read `DEP_BUGSPLAT_MONITOR` / `DEP_BUGSPLAT_REPORTER` in
-your `build.rs`. Tauri apps read `DEP_TAURI_PLUGIN_BUGSPLAT_MONITOR` /
-`DEP_TAURI_PLUGIN_BUGSPLAT_REPORTER` instead (see [Tauri](#tauri)).
-bugsplat-native looks next to the executable, in `Helpers/`, and on macOS in
-`<App>.app/Contents/Helpers`. During development (`cargo run`) nothing needs packaging: when no
-packaged helpers are found, `bugsplat` uses the ones built for this compilation.
+executables that ship with your app. On Windows, so does `BugSplatWer.dll`, the Windows Error
+Reporting helper (see [Windows: fail-fast crashes](#windows-fail-fast-crashes)). `bugsplat-sys`
+builds them. Cargo passes their paths only to the build scripts of crates that depend on
+`bugsplat-sys` directly, so add it to your `[dependencies]` next to `bugsplat` and read
+`DEP_BUGSPLAT_MONITOR` / `DEP_BUGSPLAT_REPORTER` / `DEP_BUGSPLAT_WER` (Windows only) in your
+`build.rs`. Tauri apps read `DEP_TAURI_PLUGIN_BUGSPLAT_MONITOR` /
+`DEP_TAURI_PLUGIN_BUGSPLAT_REPORTER` / `DEP_TAURI_PLUGIN_BUGSPLAT_WER` instead (see
+[Tauri](#tauri)).
+
+bugsplat-native looks for the monitor and reporter next to the executable, in `Helpers/`, and on
+macOS in `<App>.app/Contents/Helpers`. During development (`cargo run`) nothing needs packaging:
+when no packaged helpers are found, `bugsplat` uses the ones built for this compilation.
+
+### Windows: fail-fast crashes
+
+Crashes that never reach Crashpad's exception filter (`__fastfail`, `/GS` stack buffer overruns,
+some heap corruption) are handed to Windows Error Reporting, which passes them to BugSplat only
+through `BugSplatWer.dll`. `bugsplat-sys` links the SDK into your executable, so the SDK looks for
+the DLL **next to the executable** and logs `BugSplatWer.dll not found next to the library` when
+it is missing. Two things are needed:
+
+1. **Ship `BugSplatWer.dll` next to your `.exe`.** `cargo build` and `cargo run` copy it into
+   `target/<profile>/` (and its `examples/` and `deps/`) for you; your installer must put it next
+   to the installed `.exe` (for Tauri, see below).
+2. **Allow-list its full path.** WER calls only helpers listed under
+   `SOFTWARE\Microsoft\Windows\Windows Error Reporting\RuntimeExceptionHelperModules` as a
+   `REG_DWORD` value named after the DLL's path. A machine-wide installer (elevated, Program Files)
+   writes it under `HKLM`; a per-user installer (`%LOCALAPPDATA%`, no elevation) writes it under
+   `HKCU`. Remove it on uninstall. To try it from `target\debug`:
+
+   ```bat
+   reg add "HKCU\SOFTWARE\Microsoft\Windows\Windows Error Reporting\RuntimeExceptionHelperModules" /v "%CD%\target\debug\BugSplatWer.dll" /t REG_DWORD /d 0
+   ```
+
+`BugSplat.log` (in `%LOCALAPPDATA%\BugSplat\<app>-<version>\`) records the result on every
+start: `WER helper ...: registered=1 allow-listed=1 -> coverage on`.
+`unsafe { bugsplat_sys::bugsplat_has_capability(bugsplat_sys::bugsplat_capability::BUGSPLAT_CAP_WER) }`
+returns 1 only when both steps are done. Hardware faults in your own code (access violations, stack overflows) do not need
+WER.
 
 ## Tauri
 
@@ -116,10 +147,13 @@ fn main() {
 }
 ```
 
-Add `"bugsplat:default"` to your capability. To bundle the helpers on macOS, have `build.rs` copy
-the paths in `DEP_TAURI_PLUGIN_BUGSPLAT_MONITOR` and `DEP_TAURI_PLUGIN_BUGSPLAT_REPORTER` into a
-`bugsplat-helpers/` directory before calling `tauri_build::build()`, and map them in
-`tauri.conf.json`:
+Add `"bugsplat:default"` to your capability. To bundle the helpers, have `build.rs` copy the
+paths in `DEP_TAURI_PLUGIN_BUGSPLAT_MONITOR`, `DEP_TAURI_PLUGIN_BUGSPLAT_REPORTER` and (Windows)
+`DEP_TAURI_PLUGIN_BUGSPLAT_WER` into a `bugsplat-helpers/` directory before calling
+`tauri_build::build()` (`examples/my-tauri-crasher/src-tauri/build.rs` does this), then map them
+in the bundle configuration.
+
+macOS, in `tauri.conf.json`:
 
 ```json
 "bundle": { "macOS": { "files": {
@@ -127,6 +161,35 @@ the paths in `DEP_TAURI_PLUGIN_BUGSPLAT_MONITOR` and `DEP_TAURI_PLUGIN_BUGSPLAT_
   "Helpers/BugSplatReporter.app": "bugsplat-helpers/BugSplatReporter.app"
 } } }
 ```
+
+Windows, in `tauri.windows.conf.json` next to it (Tauri merges it into `tauri.conf.json` on
+Windows). On Windows, `bundle.resources` are installed next to the `.exe` by both the NSIS and MSI
+bundles, and `tauri_build` also copies them into `target/<profile>` for `cargo tauri dev`:
+
+```json
+{
+  "bundle": {
+    "resources": {
+      "bugsplat-helpers/BugSplatMonitor.exe": "BugSplatMonitor.exe",
+      "bugsplat-helpers/BugSplatReporter.exe": "BugSplatReporter.exe",
+      "bugsplat-helpers/BugSplatWer.dll": "BugSplatWer.dll"
+    },
+    "windows": {
+      "nsis": { "installerHooks": "windows/bugsplat-hooks.nsh" },
+      "wix": {
+        "fragmentPaths": ["windows/bugsplat-wer.wxs"],
+        "componentRefs": ["BugSplatWerAllowList"]
+      }
+    }
+  }
+}
+```
+
+The NSIS hooks and the WiX fragment write the WER allow-list entry for the installed
+`BugSplatWer.dll` and remove it on uninstall: Tauri's default NSIS install is per user, so the hook
+writes `HKCU` (`HKLM` with `"installMode": "perMachine"`), and the MSI, which installs per machine,
+writes `HKLM`. Copy both files from `examples/my-tauri-crasher/src-tauri/windows/`; if you already
+have NSIS hooks, add the two macros' lines to yours.
 
 JavaScript errors are posted from Rust, so the webview's Content Security Policy needs no
 BugSplat origin. Call `window.BugSplat.post(error, { key: "value" })` to report handled errors.
@@ -145,7 +208,7 @@ crash, a Rust panic, and JavaScript errors. See its README.
 
 ## Third-party licenses
 
-bugsplat-rs is MIT. An app that ships `BugSplatMonitor` and `BugSplatReporter` also redistributes
+bugsplat-rs is MIT. An app that ships `BugSplatMonitor`, `BugSplatReporter` and `BugSplatWer.dll` also redistributes
 the code compiled into them, so include these notices with your app (e.g. in an "Acknowledgements"
 file or About box):
 

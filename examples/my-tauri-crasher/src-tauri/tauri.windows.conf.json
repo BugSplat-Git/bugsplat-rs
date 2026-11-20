@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["nsis", "msi"],
+    "resources": {
+      "bugsplat-helpers/BugSplatMonitor.exe": "BugSplatMonitor.exe",
+      "bugsplat-helpers/BugSplatReporter.exe": "BugSplatReporter.exe",
+      "bugsplat-helpers/BugSplatWer.dll": "BugSplatWer.dll"
+    },
+    "windows": {
+      "nsis": {
+        "installerHooks": "windows/bugsplat-hooks.nsh"
+      },
+      "wix": {
+        "fragmentPaths": ["windows/bugsplat-wer.wxs"],
+        "componentRefs": ["BugSplatWerAllowList"]
+      }
+    }
+  }
+}
