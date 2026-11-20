@@ -23,7 +23,7 @@ bugsplat-native, BugSplat's native SDK (Crashpad, out of process). Setup guide:
 
 ```toml
 [dependencies]
-bugsplat = "0.1"
+bugsplat = "0.2"
 ```
 
 ```rust
@@ -132,8 +132,8 @@ WER.
 
 ```toml
 [dependencies]
-bugsplat = "0.1"
-tauri-plugin-bugsplat = "0.1"
+bugsplat = "0.2"
+tauri-plugin-bugsplat = "0.2"
 ```
 
 ```rust
