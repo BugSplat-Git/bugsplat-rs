@@ -1,4 +1,9 @@
-//! Builds bugsplat-native with CMake (static SDK + BugSplatMonitor + BugSplatReporter) and links it.
+//! Builds bugsplat-native with CMake (static SDK + BugSplatMonitor + BugSplatReporter, and on
+//! Windows BugSplatWer.dll) and links it.
+//!
+//! On Windows, BugSplatWer.dll is also copied into the directories Cargo puts executables in
+//! (`target/<profile>`, its `examples/` and `deps/`), because the statically linked SDK registers
+//! it from next to the executable; see `copy_next_to_executables`.
 //!
 //! Environment:
 //! - `BUGSPLAT_NATIVE_SRC`: use this bugsplat-native checkout instead of the bundled submodule.
@@ -31,7 +36,7 @@ fn main() {
             native.display()
         );
     }
-    for dir in ["include", "src", "monitor", "reporter", "cmake", "CMakeLists.txt", "VERSION"] {
+    for dir in ["include", "src", "monitor", "reporter", "wer", "cmake", "CMakeLists.txt", "VERSION"] {
         println!("cargo:rerun-if-changed={}", native.join(dir).display());
     }
 
@@ -75,7 +80,8 @@ fn main() {
     }
 
     // Helper locations: for the safe crate's development fallback (rustc-env) and for
-    // dependents' build scripts that package them (DEP_BUGSPLAT_MONITOR / DEP_BUGSPLAT_REPORTER).
+    // dependents' build scripts that package them (DEP_BUGSPLAT_MONITOR / DEP_BUGSPLAT_REPORTER /
+    // DEP_BUGSPLAT_WER).
     if let Some(monitor) = info.get("monitor") {
         println!("cargo:rustc-env=BUGSPLAT_SYS_MONITOR={monitor}");
         println!("cargo:monitor={monitor}");
@@ -84,7 +90,41 @@ fn main() {
         println!("cargo:rustc-env=BUGSPLAT_SYS_REPORTER={reporter}");
         println!("cargo:reporter={reporter}");
     }
+    // Windows only. The SDK is linked into the executable, so it looks for BugSplatWer.dll next to
+    // the executable; there is no development fallback for it, so put it there for `cargo run`.
+    if let Some(wer) = info.get("wer") {
+        println!("cargo:rustc-env=BUGSPLAT_SYS_WER={wer}");
+        println!("cargo:wer={wer}");
+        copy_next_to_executables(Path::new(wer));
+    }
     println!("cargo:include={}", native.join("include").display());
+}
+
+/// Copies `file` to where Cargo writes this build's executables: `<profile>/` (binaries, so
+/// `cargo run` and `cargo tauri dev`), `<profile>/examples/` and `<profile>/deps/` (tests).
+///
+/// Cargo has no supported way to name those directories, so they are derived from OUT_DIR, which
+/// is `<target-dir>/[<triple>/]<profile>/build/bugsplat-sys-<hash>/out`. With any other layout, or
+/// if a copy fails, this warns and the build goes on: the app still runs, without WER coverage.
+fn copy_next_to_executables(file: &Path) {
+    let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR is set for build scripts"));
+    let mut ancestors = out_dir.ancestors().skip(2);
+    let (Some(build), Some(profile_dir)) = (ancestors.next(), ancestors.next()) else { return };
+    if build.file_name() != Some("build".as_ref()) {
+        println!(
+            "cargo:warning=unexpected OUT_DIR layout ({}); copy {} next to your executable yourself",
+            out_dir.display(),
+            file.display()
+        );
+        return;
+    }
+    let name = file.file_name().expect("helper path has a file name");
+    for dir in [profile_dir.to_path_buf(), profile_dir.join("examples"), profile_dir.join("deps")] {
+        let dest = dir.join(name);
+        if let Err(e) = std::fs::create_dir_all(&dir).and_then(|_| std::fs::copy(file, &dest)) {
+            println!("cargo:warning=could not copy {} to {}: {e}", file.display(), dest.display());
+        }
+    }
 }
 
 /// Points CMake at the `link.exe` and `lib.exe` next to the `cl.exe` the cmake crate passes.
