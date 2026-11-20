@@ -19,7 +19,7 @@ wry = ["tauri/wry"]
 
 [dependencies]
 bugsplat = { workspace = true, features = ["js"] }
-# Direct dependency so build.rs receives DEP_BUGSPLAT_MONITOR / DEP_BUGSPLAT_REPORTER.
+# Direct dependency so build.rs receives DEP_BUGSPLAT_MONITOR / DEP_BUGSPLAT_REPORTER / DEP_BUGSPLAT_WER.
 bugsplat-sys.workspace = true
 tauri = { version = "2", default-features = false }
 serde = { version = "1", features = ["derive"] }

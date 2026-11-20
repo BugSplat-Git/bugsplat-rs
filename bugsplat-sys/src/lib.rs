@@ -3,9 +3,11 @@
 //! You almost certainly want the safe [`bugsplat`](https://docs.rs/bugsplat) crate instead.
 //!
 //! The SDK is built from source with CMake against BugSplat's pinned Crashpad prebuilt and linked
-//! statically. `BugSplatMonitor` and `BugSplatReporter` are built alongside it and must ship with
-//! the application; [`BUILT_MONITOR_PATH`] and [`BUILT_REPORTER_PATH`] point at the copies built
-//! for this compilation so development builds (`cargo run`) work without packaging.
+//! statically. `BugSplatMonitor` and `BugSplatReporter` (and on Windows `BugSplatWer.dll`) are built
+//! alongside it and must ship with the application; [`BUILT_MONITOR_PATH`] and
+//! [`BUILT_REPORTER_PATH`] point at the copies built for this compilation so development builds
+//! (`cargo run`) work without packaging. `BugSplatWer.dll` has no such fallback: the SDK only looks
+//! for it next to the executable, so the build script copies it into `target/<profile>`.
 #![allow(non_camel_case_types, non_upper_case_globals, non_snake_case, clippy::all)]
 
 mod bindings {
@@ -18,6 +20,9 @@ pub const BUILT_MONITOR_PATH: Option<&str> = option_env!("BUGSPLAT_SYS_MONITOR")
 
 /// `BugSplatReporter` (an `.app` bundle on macOS) built by this crate's build script.
 pub const BUILT_REPORTER_PATH: Option<&str> = option_env!("BUGSPLAT_SYS_REPORTER");
+
+/// `BugSplatWer.dll` built by this crate's build script (Windows only; `None` elsewhere).
+pub const BUILT_WER_PATH: Option<&str> = option_env!("BUGSPLAT_SYS_WER");
 
 #[cfg(test)]
 mod tests {
@@ -47,5 +52,27 @@ mod tests {
             let path = path.expect("build script exports helper paths");
             assert!(std::path::Path::new(path).exists(), "{path} missing");
         }
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn wer_helper_was_built_and_copied_next_to_executables() {
+        let path = BUILT_WER_PATH.expect("build script exports wer= on Windows");
+        assert!(std::path::Path::new(path).exists(), "{path} missing");
+        // build.rs copies it into the profile directory (target/<profile>, marked by Cargo's
+        // .cargo-lock), where `cargo run` starts executables. Test binaries live below it.
+        let exe = std::env::current_exe().unwrap();
+        let profile_dir = exe
+            .ancestors()
+            .find(|dir| dir.join(".cargo-lock").exists())
+            .expect("test binary runs inside a Cargo profile directory");
+        let copy = profile_dir.join("BugSplatWer.dll");
+        assert!(copy.exists(), "{} missing", copy.display());
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn wer_helper_is_windows_only() {
+        assert_eq!(BUILT_WER_PATH, None);
     }
 }

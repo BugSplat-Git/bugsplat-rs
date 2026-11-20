@@ -1,4 +1,5 @@
-# Builds bugsplat-native for bugsplat-sys: the static SDK, BugSplatMonitor and BugSplatReporter.
+# Builds bugsplat-native for bugsplat-sys: the static SDK, BugSplatMonitor, BugSplatReporter and,
+# on Windows, BugSplatWer.dll (the WER helper the SDK registers from next to the executable).
 #
 # Cargo links one archive, so this wrapper walks the link closure of the `bugsplat` target
 # (the core, Crashpad's client libraries, frameworks and system libraries), merges every static
@@ -130,6 +131,9 @@ endif()
 if(TARGET BugSplatReporter)
   list(APPEND _bs_helpers BugSplatReporter)
 endif()
+if(TARGET BugSplatWer)
+  list(APPEND _bs_helpers BugSplatWer)
+endif()
 add_custom_target(bugsplat_rs ALL DEPENDS "${_bs_merged}" ${_bs_helpers})
 
 # build.rs reads this: one `key=value` per line.
@@ -145,5 +149,8 @@ if(TARGET BugSplatReporter)
     string(APPEND _bs_info "reporter=$<TARGET_FILE:BugSplatReporter>\n")
   endif()
   string(APPEND _bs_info "reporter_dir=$<TARGET_FILE_DIR:BugSplatReporter>\n")
+endif()
+if(TARGET BugSplatWer)
+  string(APPEND _bs_info "wer=$<TARGET_FILE:BugSplatWer>\n")
 endif()
 file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/bugsplat-link.txt" CONTENT "${_bs_info}")

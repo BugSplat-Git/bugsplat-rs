@@ -5,18 +5,25 @@ fn main() {
     tauri_build::build()
 }
 
-/// Copies BugSplatMonitor and BugSplatReporter, which bugsplat-sys builds and
-/// tauri-plugin-bugsplat passes on as DEP_TAURI_PLUGIN_BUGSPLAT_*, to bugsplat-helpers/. From
-/// there tauri.conf.json's bundle.macOS.files puts them in my-tauri-crasher.app/Contents/Helpers.
-/// `cargo tauri dev` needs none of this: with no packaged helpers, bugsplat uses the ones built
-/// for this compilation.
+/// Copies the BugSplat helpers, which bugsplat-sys builds and tauri-plugin-bugsplat passes on as
+/// DEP_TAURI_PLUGIN_BUGSPLAT_*, to bugsplat-helpers/. From there tauri.conf.json's
+/// bundle.macOS.files puts BugSplatMonitor and BugSplatReporter.app in
+/// my-tauri-crasher.app/Contents/Helpers, and on Windows tauri.windows.conf.json's
+/// bundle.resources puts BugSplatMonitor.exe, BugSplatReporter.exe and BugSplatWer.dll next to
+/// my-tauri-crasher.exe in the NSIS and MSI installs (and in target/<profile> for `cargo tauri dev`).
+/// On macOS and Linux, `cargo tauri dev` needs none of this: with no packaged helpers, bugsplat uses
+/// the ones built for this compilation.
 fn stage_bugsplat_helpers() {
     let dest = PathBuf::from("bugsplat-helpers");
-    for key in ["MONITOR", "REPORTER"] {
+    let windows = std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows");
+    // BugSplatWer.dll, the Windows Error Reporting helper, exists only on Windows.
+    for (key, expected) in [("MONITOR", true), ("REPORTER", true), ("WER", windows)] {
         let var = format!("DEP_TAURI_PLUGIN_BUGSPLAT_{key}");
         println!("cargo:rerun-if-env-changed={var}");
         let Ok(src) = std::env::var(&var) else {
-            println!("cargo:warning={var} not set; BugSplat helpers will not be bundled");
+            if expected {
+                println!("cargo:warning={var} not set; BugSplat helpers will not be bundled");
+            }
             continue;
         };
         let src = PathBuf::from(src);
