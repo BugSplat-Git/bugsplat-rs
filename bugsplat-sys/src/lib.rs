@@ -53,4 +53,21 @@ mod tests {
             assert!(std::path::Path::new(path).exists(), "{path} missing");
         }
     }
+
+    #[test]
+    #[cfg(windows)]
+    fn wer_helper_was_built_and_copied_next_to_executables() {
+        let path = BUILT_WER_PATH.expect("build script exports wer= on Windows");
+        assert!(std::path::Path::new(path).exists(), "{path} missing");
+        // Test binaries run from target/<profile>/deps, one of the directories build.rs copies to.
+        let exe = std::env::current_exe().unwrap();
+        let copy = exe.parent().unwrap().join("BugSplatWer.dll");
+        assert!(copy.exists(), "{} missing", copy.display());
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn wer_helper_is_windows_only() {
+        assert_eq!(BUILT_WER_PATH, None);
+    }
 }
