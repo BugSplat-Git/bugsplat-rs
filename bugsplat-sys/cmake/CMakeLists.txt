@@ -92,8 +92,13 @@ message(STATUS "bugsplat-sys system libs: ${_bs_system}")
 # ---- one archive for cargo ----------------------------------------------------------------
 if(MSVC)
   set(_bs_merged "${CMAKE_BINARY_DIR}/bugsplat_rs.lib")
-  find_program(_bs_lib_exe lib.exe HINTS "${CMAKE_LINKER}/.." REQUIRED)
-  set(_bs_merge_cmd "${_bs_lib_exe}" /NOLOGO "/OUT:${_bs_merged}" ${_bs_archives})
+  # The lib.exe of the compiler's own toolset, looked up on every configure: a cached path would
+  # survive a Visual Studio update (or a CI cache restored on another runner image) and point at
+  # a toolset that is gone. NO_CACHE skips the search if the variable exists, hence the new name.
+  unset(_bs_lib_exe CACHE)
+  cmake_path(GET CMAKE_C_COMPILER PARENT_PATH _bs_msvc_bin)
+  find_program(_bs_msvc_lib lib.exe HINTS "${_bs_msvc_bin}" NO_CACHE REQUIRED)
+  set(_bs_merge_cmd "${_bs_msvc_lib}" /NOLOGO "/OUT:${_bs_merged}" ${_bs_archives})
 elseif(APPLE)
   set(_bs_merged "${CMAKE_BINARY_DIR}/libbugsplat_rs.a")
   set(_bs_merge_cmd /usr/bin/libtool -static -no_warning_for_no_symbols -o "${_bs_merged}" ${_bs_archives})

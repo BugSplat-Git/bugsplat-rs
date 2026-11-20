@@ -25,13 +25,20 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
+      # ImageVersion is a runner environment variable, which the `env` expression context does not
+      # include; read it in a step so the cache key can use it.
+      - name: Runner image version
+        id: image
+        shell: bash
+        run: echo "version=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             target
             .crashpad-cache
-          key: ${{ runner.os }}-${{ hashFiles('Cargo.lock', 'bugsplat-sys/bugsplat-native/cmake/crashpad.lock') }}
+          # The image version keeps a CMake cache from one MSVC/Xcode/GCC toolset off a runner with another.
+          key: ${{ runner.os }}-${{ steps.image.outputs.version }}-${{ hashFiles('Cargo.lock', 'bugsplat-sys/bugsplat-native/cmake/crashpad.lock') }}
       - name: cargo test
         run: cargo test --workspace --all-features
         env:

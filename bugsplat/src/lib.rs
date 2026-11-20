@@ -32,7 +32,7 @@ use std::sync::{Mutex, MutexGuard};
 use bugsplat_sys as sys;
 
 pub use error::Error;
-pub use options::{DumpType, HangPolicy, Options, UploadPolicy};
+pub use options::{CrashType, DumpType, HangPolicy, Options, UploadPolicy};
 
 /// Report metadata mirrored on the Rust side, for reports Rust sends itself (JavaScript errors).
 #[derive(Debug, Clone, Default)]

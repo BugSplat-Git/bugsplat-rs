@@ -49,6 +49,9 @@ fn main() {
     } else if target_os == "windows" {
         panic!("bugsplat-sys needs Ninja on Windows (e.g. `winget install Ninja-build.Ninja`).");
     }
+    if env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
+        pin_msvc_tools(&mut config);
+    }
     if target_os == "macos" {
         // The Crashpad prebuilt targets macOS 11.5.
         let floor = env::var("MACOSX_DEPLOYMENT_TARGET").unwrap_or_else(|_| "11.5".into());
@@ -82,6 +85,25 @@ fn main() {
         println!("cargo:reporter={reporter}");
     }
     println!("cargo:include={}", native.join("include").display());
+}
+
+/// Points CMake at the `link.exe` and `lib.exe` next to the `cl.exe` the cmake crate passes.
+/// CMake keeps the linker it found in its cache, so a build directory configured with another
+/// MSVC toolset (before a Visual Studio update, or a CI cache restored on a newer runner image)
+/// would otherwise pair this compiler with a linker that may no longer exist.
+fn pin_msvc_tools(config: &mut cmake::Config) {
+    let Ok(compiler) = cc::Build::new().cargo_metadata(false).try_get_compiler() else {
+        return;
+    };
+    let Some(bin) = compiler.path().parent() else {
+        return;
+    };
+    for (var, exe) in [("CMAKE_LINKER", "link.exe"), ("CMAKE_AR", "lib.exe")] {
+        let tool = bin.join(exe);
+        if tool.exists() {
+            config.define(var, tool.to_string_lossy().replace('\\', "/"));
+        }
+    }
 }
 
 fn read_link_info(path: &Path) -> HashMap<String, String> {
