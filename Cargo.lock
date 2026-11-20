@@ -331,6 +331,7 @@ dependencies = [
 name = "bugsplat-sys"
 version = "0.1.1"
 dependencies = [
+ "cc",
  "cmake",
 ]
 

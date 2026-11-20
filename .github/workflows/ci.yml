@@ -31,7 +31,8 @@ jobs:
             ~/.cargo/registry
             target
             .crashpad-cache
-          key: ${{ runner.os }}-${{ hashFiles('Cargo.lock', 'bugsplat-sys/bugsplat-native/cmake/crashpad.lock') }}
+          # The image version keeps a CMake cache from one MSVC/Xcode/GCC toolset off a runner with another.
+          key: ${{ runner.os }}-${{ env.ImageVersion }}-${{ hashFiles('Cargo.lock', 'bugsplat-sys/bugsplat-native/cmake/crashpad.lock') }}
       - name: cargo test
         run: cargo test --workspace --all-features
         env:
