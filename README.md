@@ -70,7 +70,7 @@ split-debuginfo = "packed"   # macOS: writes myapp.dSYM
 |---|---|---|
 | macOS | `target/release/myapp.dSYM` | `split-debuginfo = "packed"` |
 | Linux | `myapp.debug` from `objcopy --only-keep-debug` | Build with `CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO=off` (`dump_syms` does not read `.dwp`, so split DWARF loses your crate's file/line info), then `objcopy --only-keep-debug myapp myapp.debug && objcopy --strip-debug --add-gnu-debuglink=myapp.debug myapp`. Upload `myapp.debug`, ship the stripped `myapp`. |
-| Windows | `target/release/myapp.pdb` | Always written by MSVC |
+| Windows | `target/release/myapp.pdb` | Always written by MSVC. Hyphens in the binary name become underscores: `my-app.exe` has `my_app.pdb` |
 
 ```sh
 # macOS
