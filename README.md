@@ -70,16 +70,40 @@ split-debuginfo = "packed"   # macOS: writes myapp.dSYM
 |---|---|---|
 | macOS | `target/release/myapp.dSYM` | `split-debuginfo = "packed"` |
 | Linux | `myapp.debug` from `objcopy --only-keep-debug` | Build with `CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO=off` (`dump_syms` does not read `.dwp`, so split DWARF loses your crate's file/line info), then `objcopy --only-keep-debug myapp myapp.debug && objcopy --strip-debug --add-gnu-debuglink=myapp.debug myapp`. Upload `myapp.debug`, ship the stripped `myapp`. |
-| Windows | `target/release/myapp.pdb` | Always written by MSVC. Hyphens in the binary name become underscores: `my-app.exe` has `my_app.pdb` |
+| Windows | `target/release/myapp.exe`, with `myapp.pdb` next to it | Convert the `.exe`, not the `.pdb`: see [Windows](#windows-convert-the-exe) below. MSVC always writes the `.pdb`. Hyphens in the binary name become underscores: `my-app.exe` has `my_app.pdb` |
 
 ```sh
 # macOS
 npx @bugsplat/symbol-upload -b my-database -a MyApp -v 1.2.3 -d target/release -f "myapp.dSYM" -m
 # Windows
-npx @bugsplat/symbol-upload -b my-database -a MyApp -v 1.2.3 -d target/release -f "myapp.pdb" -m
+npx @bugsplat/symbol-upload -b my-database -a MyApp -v 1.2.3 -d target/release -f "myapp.exe" -m
 ```
 
 `application` and `version` must match the values passed to `Options::new`.
+
+#### Windows: convert the `.exe`
+
+Point `-f` at the `.exe` (or `.dll`) and keep its `.pdb` in the same directory. `dump_syms` reads
+names and line numbers from the `.pdb`, but the x64 unwind data (`.pdata`/`.xdata`) is in the
+binary. A `.sym` made from the `.pdb` alone has no `STACK CFI` records, so only the crashing frame
+is right and the frames below it are found by scanning the stack.
+
+If the `.pdb` and the `.exe` have different names, which is every crate with a hyphen in its name
+(`my-app.exe` has `my_app.pdb`), check your symbol-upload version. BugSplat looks the module up
+as `my_app.pdb/<id>/my_app.sym`. symbol-upload 11.3.0 and earlier name the converted file after
+the `.exe` and upload `my-app.sym`, which is never found, and the crash has no symbols at all
+([symbol-upload#226](https://github.com/BugSplat-Git/symbol-upload/issues/226)). With those
+versions, convert to a local directory, rename, and upload the `.sym`:
+
+```sh
+# my_app.pdb is next to my-app.exe
+npx @bugsplat/symbol-upload -d target/release -f "my-app.exe" -m -l out
+cp out/my_app.pdb/*/*.sym out/my_app.sym     # the .pdb's name, with .sym
+npx @bugsplat/symbol-upload -b my-database -a MyApp -v 1.2.3 -d out -f "my_app.sym"
+```
+
+A release build can check the first problem before it uploads: `grep -c "^STACK CFI" out/my_app.sym`
+prints `0`, and exits non-zero, for a `.sym` with no unwind data.
 
 The crate posts every crash as a Crashpad minidump (`CrashType::Crashpad`), Windows included, so the
 same `.sym` files work on all three platforms. To have Windows crashes read `.pdb` files instead,
