@@ -97,8 +97,9 @@ versions, convert to a local directory, rename, and upload the `.sym`:
 
 ```sh
 # my_app.pdb is next to my-app.exe
-npx @bugsplat/symbol-upload -d target/release -f "my-app.exe" -m -l out
-cp out/my_app.pdb/*/*.sym out/my_app.sym     # the .pdb's name, with .sym
+rm -rf out                                   # an earlier build's .sym must not be left in it
+npx @bugsplat/symbol-upload -d target/release -f "my-app.exe" -m -l out &&
+cp out/my_app.pdb/*/*.sym out/my_app.sym &&  # the .pdb's name, with .sym
 npx @bugsplat/symbol-upload -b my-database -a MyApp -v 1.2.3 -d out -f "my_app.sym"
 ```
 
