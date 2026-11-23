@@ -153,6 +153,15 @@ start: `WER helper ...: registered=1 allow-listed=1 -> coverage on`.
 returns 1 only when both steps are done. Hardware faults in your own code (access violations, stack overflows) do not need
 WER.
 
+The DLL keeps its own trace in `%LOCALAPPDATA%\BugSplat\BugSplatWer.log`: one line for each crash
+Windows hands it, saying whether it claimed it. When a fail-fast produced no report, look there
+first.
+
+An application with `uiAccess="true"` in its manifest runs above `BugSplatMonitor`'s integrity
+level, so the monitor cannot read it and every crash goes through `BugSplatWer.dll`. For such an
+application the allow-list entry is required: without it `bugsplat::init` returns
+`Error::WerHelperRequired`.
+
 ## Tauri
 
 ```toml

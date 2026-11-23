@@ -32,6 +32,12 @@ pub enum Error {
     Cancelled,
     #[error("internal SDK error")]
     Internal,
+    /// Windows: the application runs above BugSplatMonitor's integrity level (`uiAccess="true"`),
+    /// so crashes are captured through Windows Error Reporting, and `BugSplatWer.dll` is missing
+    /// or not on the `RuntimeExceptionHelperModules` allow-list. `BugSplat.log` names the registry
+    /// value to add.
+    #[error("BugSplatWer.dll is missing or not on the Windows Error Reporting allow-list, which an application above BugSplatMonitor's integrity level needs")]
+    WerHelperRequired,
     #[error("string contains an interior NUL byte")]
     Nul,
     #[error("unknown SDK result code {0}")]
@@ -56,6 +62,7 @@ impl Error {
             R::BUGSPLAT_ERR_REJECTED => Error::Rejected,
             R::BUGSPLAT_ERR_CANCELLED => Error::Cancelled,
             R::BUGSPLAT_ERR_INTERNAL => Error::Internal,
+            R::BUGSPLAT_ERR_WER_HELPER_REQUIRED => Error::WerHelperRequired,
             R(other) => Error::Unknown(other),
         };
         Err(err)
@@ -76,6 +83,7 @@ mod tests {
     fn maps_known_and_unknown_codes() {
         assert_eq!(Error::check(R::BUGSPLAT_OK), Ok(()));
         assert_eq!(Error::check(R::BUGSPLAT_ERR_MONITOR_NOT_FOUND), Err(Error::MonitorNotFound));
+        assert_eq!(Error::check(R::BUGSPLAT_ERR_WER_HELPER_REQUIRED), Err(Error::WerHelperRequired));
         assert_eq!(Error::check(R(999)), Err(Error::Unknown(999)));
     }
 }
