@@ -54,6 +54,40 @@ mod tests {
         }
     }
 
+    /// The Subsystem field of a PE image's optional header. It sits 68 bytes in for both PE32
+    /// and PE32+: the optional header starts after the "PE\0\0" signature and the 20-byte COFF
+    /// header, whose offset is the u32 at 0x3C.
+    fn pe_subsystem(image: &[u8]) -> u16 {
+        let u16_at = |at: usize| u16::from_le_bytes([image[at], image[at + 1]]);
+        assert_eq!(&image[..2], b"MZ", "not a PE image");
+        let pe = u32::from_le_bytes(image[0x3C..0x40].try_into().unwrap()) as usize;
+        assert_eq!(&image[pe..pe + 4], b"PE\0\0", "not a PE image");
+        u16_at(pe + 4 + 20 + 68)
+    }
+
+    #[test]
+    fn pe_subsystem_reads_the_optional_header() {
+        // A minimal image: the DOS header points at a PE header at 0x80.
+        let mut image = vec![0u8; 0x80 + 4 + 20 + 70];
+        image[..2].copy_from_slice(b"MZ");
+        image[0x3C..0x40].copy_from_slice(&0x80u32.to_le_bytes());
+        image[0x80..0x84].copy_from_slice(b"PE\0\0");
+        image[0x80 + 4 + 20 + 68] = 2;
+        assert_eq!(pe_subsystem(&image), 2);
+    }
+
+    /// Crashpad starts BugSplatMonitor.exe without CREATE_NO_WINDOW, so as a console program it
+    /// opened a console window for the whole life of every GUI app (issue #23). It must be a
+    /// windowed program (IMAGE_SUBSYSTEM_WINDOWS_GUI).
+    #[test]
+    #[cfg(windows)]
+    fn monitor_is_a_windowed_program() {
+        const IMAGE_SUBSYSTEM_WINDOWS_GUI: u16 = 2;
+        let path = BUILT_MONITOR_PATH.expect("build script exports monitor=");
+        let image = std::fs::read(path).unwrap_or_else(|e| panic!("{path}: {e}"));
+        assert_eq!(pe_subsystem(&image), IMAGE_SUBSYSTEM_WINDOWS_GUI, "{path} is not a windowed program");
+    }
+
     #[test]
     #[cfg(windows)]
     fn wer_helper_was_built_and_copied_next_to_executables() {
