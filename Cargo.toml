@@ -3,7 +3,7 @@ resolver = "2"
 members = ["bugsplat-sys", "bugsplat", "tauri-plugin-bugsplat", "examples/crasher", "examples/my-tauri-crasher/src-tauri"]
 
 [workspace.package]
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 license = "MIT"
 # The repository is private for now, so the crates point at the docs instead.
@@ -12,8 +12,8 @@ authors = ["BugSplat <support@bugsplat.com>"]
 rust-version = "1.81"
 
 [workspace.dependencies]
-bugsplat-sys = { path = "bugsplat-sys", version = "0.3.0" }
-bugsplat = { path = "bugsplat", version = "0.3.0" }
+bugsplat-sys = { path = "bugsplat-sys", version = "0.3.1" }
+bugsplat = { path = "bugsplat", version = "0.3.1" }
 
 # Line tables + a .dSYM on macOS for `symbol-upload -m`. On Linux build with
 # CARGO_PROFILE_RELEASE_SPLIT_DEBUGINFO=off (dump_syms does not read .dwp); see README.
